@@ -1,5 +1,7 @@
 # godot-sprite-mcp
 
+**[English](README.md) | [简体中文](README_zh.md)**
+
 A lightweight **Model Context Protocol (MCP) server & CLI for Godot 4.x** that slices 2D spritesheets, exports `SpriteFrames (.tres)` animations, and computes feet-aligned body colliders (`CollisionShape2D`) directly from PNG alpha channels.
 
 ![Animated Demo](docs/demo_animation.gif)
