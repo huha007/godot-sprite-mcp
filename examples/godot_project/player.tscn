@@ -1,0 +1,23 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="SpriteFrames" path="res://resources/player_frames.tres" id="1_frames"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(22.0, 21.0)
+
+[node name="Player" type="CharacterBody2D"]
+position = Vector2(320, 220)
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+offset = Vector2(0.0, -14.0)
+sprite_frames = ExtResource("1_frames")
+animation = &"walk"
+autoplay = &"walk"
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0.0, -10.5)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(0.0, -10.5)
+zoom = Vector2(3, 3)

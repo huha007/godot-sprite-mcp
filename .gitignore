@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+tests/_artifacts/
+.godot/
+.godot_appdata/
+.tmp_*
+*.zip
+examples/Red/
+examples/Soldier/
+examples/Tiny RPG Character Asset Pack*/
+
