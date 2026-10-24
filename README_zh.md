@@ -20,11 +20,11 @@
 
 ---
 
-## 🚀 快速接入（如何作为 AI 插件使用？）
+## 🚀 快速开始（MCP 配置）
 
-你不需要在 Godot 工程里安装任何插件，只需将本工具添加到你的 AI 编程助手（如 **Cursor、Claude Code、Windsurf、Cline、Codex** 等）的 MCP 配置文件（`mcp.json`）中即可：
+将 `godot-sprite-mcp` 添加到你的 AI 编程客户端（如 **Cursor、Claude Code、Windsurf、Cline、Codex** 等）的 `mcp.json` 配置文件中：
 
-### 方式一：通过 `uvx` 免安装直接运行（推荐，需仓库公开或已授权 GitHub）
+### 方式一：通过 `uvx` 免安装运行（推荐）
 
 ```json
 {
@@ -63,9 +63,9 @@ pip install -e .
 
 ---
 
-## 💬 接入后怎么用？（直接在聊天框对 AI 说人话）
+## 💬 提问示例
 
-配置完成后，你的 AI 助手就自动学会了上述 4 个技能。打开你的 Godot 项目，直接用自然语言吩咐 AI：
+配置完成后，直接在聊天框用自然语言让 AI 处理你的精灵图：
 
 - *“帮我看看 `res://assets/knight_sheet.png` 里有几帧？把第一行做成 `idle`、第二行做成 `run`、第三行做成 `attack` 导出成 `.tres` 动画，并帮我生成一个带脚底对齐身体碰撞框的 `Knight.tscn` 场景。”*
 - *“分析一下 `res://assets/slime.png`，给这只史莱姆生成动画资源和合适宽度的身体碰撞体。”*
