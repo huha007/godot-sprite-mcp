@@ -5,6 +5,10 @@ It turns spritesheets into Godot `SpriteFrames` resources, reports frame
 layouts, and builds feet-aligned body colliders without requiring Godot, OpenCV,
 or a browser.
 
+![Animated Demo](docs/demo_animation.gif)
+
+![Collider Comparison](docs/showcase_collider.png)
+
 - Python 3.10+
 - Pure NumPy/Pillow image analysis
 - Godot 4 resource syntax (`format=3`, `AtlasTexture`, `&"StringName"`)
