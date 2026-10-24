@@ -24,6 +24,7 @@ if str(SRC_ROOT) not in sys.path:
 
 from godot_sprite_mcp.core import (  # noqa: E402
     build_body_collider,
+    build_character_scene,
     build_sprite_frames,
     extract_collision_polygon,
     inspect_spritesheet,
@@ -682,6 +683,31 @@ class PipelineTests(unittest.TestCase):
         # symmetric around the origin even though its area is not.
         self.assertAlmostEqual(min(xs) + max(xs), 0.0, delta=1.0)
         self.assertAlmostEqual(min(ys) + max(ys), 0.0, delta=1.0)
+
+        # 4. Test res:// URI support in inspect_spritesheet and build_character_scene
+        res_layout = inspect_spritesheet(
+            "res://assets/walk.png", project_root=str(project)
+        )
+        self.assertEqual(res_layout["frame_count"], 4)
+
+        tscn_out = project / "WalkCharacter.tscn"
+        scene_res = build_character_scene(
+            project_root=str(project),
+            image_path="res://assets/walk.png",
+            sprite_frames_tres="res://resources/walk_frames.tres",
+            output_tscn="res://WalkCharacter.tscn",
+            collider_frames=animations[0]["frames"],
+            root_name="WalkCharacter",
+            default_animation="walk",
+        )
+        self.assertTrue(tscn_out.is_file())
+        self.assertEqual(
+            scene_res["sprite_frames_res"], "res://resources/walk_frames.tres"
+        )
+        tscn_text = tscn_out.read_text(encoding="utf-8")
+        self.assertIn('[node name="WalkCharacter" type="CharacterBody2D"]', tscn_text)
+        self.assertIn('animation = &"walk"', tscn_text)
+        self.assertIn('[node name="CollisionShape2D"', tscn_text)
 
 
 if __name__ == "__main__":

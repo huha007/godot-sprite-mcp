@@ -11,5 +11,8 @@ tests/_artifacts/
 *.zip
 examples/Red/
 examples/Soldier/
+examples/Knight/
+examples/Slime/
+examples/*_islands.png
 examples/Tiny RPG Character Asset Pack*/
 

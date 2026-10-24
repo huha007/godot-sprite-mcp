@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .core import (
     build_body_collider,
+    build_character_scene,
     build_sprite_frames,
     extract_collision_polygon,
     inspect_spritesheet,
@@ -17,4 +18,5 @@ __all__ = [
     "build_sprite_frames",
     "extract_collision_polygon",
     "build_body_collider",
+    "build_character_scene",
 ]

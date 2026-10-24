@@ -34,6 +34,7 @@ __all__ = [
     "build_sprite_frames",
     "extract_collision_polygon",
     "build_body_collider",
+    "build_character_scene",
 ]
 
 # The alpha comparison is deliberately strict (alpha > threshold).
@@ -47,10 +48,38 @@ _MAX_COLLISION_VERTICES = 24
 # ---------------------------------------------------------------------------
 
 
-def _load_rgba(image_path: str | os.PathLike[str]) -> np.ndarray:
-    """Load *image_path* as an ``(H, W, 4)`` uint8 RGBA array."""
+def _resolve_image_path(
+    image_path: str | os.PathLike[str],
+    project_root: str | os.PathLike[str] | None = None,
+) -> Path:
+    """Resolve *image_path*, supporting ``res://`` URIs and optional *project_root*."""
+
+    raw = str(image_path)
+    if raw.startswith("res://"):
+        rel = raw[len("res://") :]
+        if project_root is not None:
+            return (Path(project_root).expanduser().resolve() / rel).resolve()
+        cwd = Path.cwd().resolve()
+        for parent in (cwd, *cwd.parents):
+            if (parent / "project.godot").is_file() and (parent / rel).exists():
+                return (parent / rel).resolve()
+        return (cwd / rel).resolve()
 
     path = Path(image_path).expanduser()
+    if not path.is_absolute() and project_root is not None:
+        candidate = Path(project_root).expanduser().resolve() / path
+        if candidate.exists():
+            return candidate.resolve()
+    return path
+
+
+def _load_rgba(
+    image_path: str | os.PathLike[str],
+    project_root: str | os.PathLike[str] | None = None,
+) -> np.ndarray:
+    """Load *image_path* as an ``(H, W, 4)`` uint8 RGBA array."""
+
+    path = _resolve_image_path(image_path, project_root)
     if not path.exists():
         raise FileNotFoundError(f"Image not found: {path}")
     if not path.is_file():
@@ -330,19 +359,23 @@ def inspect_spritesheet(
     image_path: str,
     alpha_threshold: int = 10,
     mode: str = "auto",
+    project_root: str | None = None,
 ) -> dict[str, Any]:
     """Inspect a spritesheet and return frame rectangles.
 
     Parameters
     ----------
     image_path:
-        Path to a PNG (or any RGBA-capable image readable by Pillow).
+        Path to a PNG (or ``res://...`` URI when *project_root* is given or
+        inferable from the working directory).
     alpha_threshold:
         Alpha values strictly greater than this are considered opaque.
     mode:
         ``"grid"`` uses transparent separator projections, ``"islands"`` uses
         tight connected-component bounds, and ``"auto"`` tries a regular grid
         first, falling back to islands when the grid is inconsistent.
+    project_root:
+        Optional Godot project root directory for resolving ``res://`` URIs.
 
     Returns
     -------
@@ -358,7 +391,7 @@ def inspect_spritesheet(
     if requested_mode not in {"auto", "grid", "islands"}:
         raise ValueError("mode must be one of 'auto', 'grid' or 'islands'")
 
-    rgba = _load_rgba(image_path)
+    rgba = _load_rgba(image_path, project_root=project_root)
     height, width = rgba.shape[:2]
     mask = _alpha_mask(rgba, threshold)
 
@@ -1240,6 +1273,7 @@ def extract_collision_polygon(
     region: dict | None = None,
     epsilon: float = 2.0,
     centered: bool = True,
+    project_root: str | None = None,
 ) -> dict[str, Any]:
     """Extract a simplified outer collision contour from opaque pixels.
 
@@ -1261,7 +1295,7 @@ def extract_collision_polygon(
         paste ``tscn_snippet``.
     """
 
-    rgba = _load_rgba(image_path)
+    rgba = _load_rgba(image_path, project_root=project_root)
     image_height, image_width = rgba.shape[:2]
     crop_x, crop_y, crop_width, crop_height = _normalise_region(
         region, image_width, image_height
@@ -1396,6 +1430,7 @@ def build_body_collider(
     shape: str = "rectangle",
     alpha_threshold: int = 10,
     thickness_ratio: float = 0.30,
+    project_root: str | None = None,
 ) -> dict[str, Any]:
     """Build a stable single-shape body collider from an animation sequence.
 
@@ -1409,7 +1444,7 @@ def build_body_collider(
     Parameters
     ----------
     image_path:
-        Spritesheet image containing all frame regions.
+        Spritesheet image containing all frame regions (supports ``res://``).
     frames:
         All regions of one animation. Every frame must have the same ``w`` and
         ``h``. Each item is ``{"x": int, "y": int, "w": int, "h": int}``.
@@ -1420,6 +1455,8 @@ def build_body_collider(
     thickness_ratio:
         Minimum fraction of the character height a column must occupy to be
         part of the core body. Defaults to 0.30.
+    project_root:
+        Optional Godot project root directory for resolving ``res://`` URIs.
 
     Returns
     -------
@@ -1440,7 +1477,7 @@ def build_body_collider(
     if not math.isfinite(ratio) or not 0.0 < ratio <= 1.0:
         raise ValueError("thickness_ratio must be in the range (0, 1]")
 
-    rgba = _load_rgba(image_path)
+    rgba = _load_rgba(image_path, project_root=project_root)
     image_height, image_width = rgba.shape[:2]
     regions, frame_width, frame_height = _normalise_body_frames(
         frames, image_width, image_height
@@ -1623,3 +1660,119 @@ def build_body_collider(
         "collision_node_snippet": collision_node,
         "tscn_snippet": sub_resource + "\n\n" + collision_node,
     }
+
+
+def build_character_scene(
+    project_root: str,
+    image_path: str,
+    sprite_frames_tres: str,
+    output_tscn: str,
+    collider_frames: list[dict],
+    root_name: str = "Character",
+    root_type: str = "CharacterBody2D",
+    default_animation: str = "idle",
+    shape: str = "rectangle",
+    alpha_threshold: int = 10,
+    thickness_ratio: float = 0.30,
+) -> dict[str, Any]:
+    """Write a complete Godot 4 ``.tscn`` character scene with AnimatedSprite2D and body collider.
+
+    Combines an existing (or newly generated) ``SpriteFrames`` ``.tres``
+    resource with a feet-aligned ``CollisionShape2D`` computed by
+    :func:`build_body_collider` and writes a ready-to-open ``.tscn`` file.
+    """
+
+    root = Path(project_root).expanduser()
+    if not root.exists() or not root.is_dir():
+        raise FileNotFoundError(f"project_root does not exist: {root}")
+    root = root.resolve()
+
+    raw_tres = str(sprite_frames_tres)
+    if raw_tres.startswith("res://"):
+        tres_candidate = root / raw_tres[len("res://") :]
+    else:
+        supplied_tres = Path(raw_tres).expanduser()
+        tres_candidate = (
+            supplied_tres if supplied_tres.is_absolute() else root / supplied_tres
+        )
+    _, tres_relative = _resolve_within_project(
+        root, tres_candidate, label="sprite_frames_tres"
+    )
+    tres_uri = "res://" + tres_relative.as_posix()
+
+    raw_out = str(output_tscn)
+    if raw_out.startswith("res://"):
+        out_candidate = root / raw_out[len("res://") :]
+    else:
+        supplied_out = Path(raw_out).expanduser()
+        out_candidate = (
+            supplied_out if supplied_out.is_absolute() else root / supplied_out
+        )
+    out_path = out_candidate.resolve()
+
+    collider = build_body_collider(
+        image_path=image_path,
+        frames=collider_frames,
+        shape=shape,
+        alpha_threshold=alpha_threshold,
+        thickness_ratio=thickness_ratio,
+        project_root=str(root),
+    )
+
+    safe_root_name = re.sub(r'["\r\n]', "_", str(root_name).strip() or "Character")
+    safe_root_type = re.sub(
+        r"[^A-Za-z0-9_]", "", str(root_type).strip() or "CharacterBody2D"
+    )
+    anim_literal = _gd_string(str(default_animation).strip() or "idle")
+    autoplay_escaped = (
+        (str(default_animation).strip() or "idle")
+        .replace("\\", "\\\\")
+        .replace('"', '\\"')
+    )
+
+    lines = [
+        '[gd_scene load_steps=3 format=3]',
+        "",
+        f'[ext_resource type="SpriteFrames" path="{tres_uri}" id="1_frames"]',
+        "",
+        collider["sub_resource_snippet"],
+        "",
+        f'[node name="{safe_root_name}" type="{safe_root_type}"]',
+        "",
+        '[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]',
+        'sprite_frames = ExtResource("1_frames")',
+        f"animation = {anim_literal}",
+        f'autoplay = "{autoplay_escaped}"',
+        collider["sprite_offset_property"],
+        "",
+        collider["collision_node_snippet"],
+        "",
+    ]
+    text = "\n".join(lines)
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_name = tempfile.mkstemp(
+        prefix=f".{out_path.name}.",
+        suffix=".tmp",
+        dir=str(out_path.parent),
+        text=True,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+            handle.write(text)
+        os.replace(tmp_name, out_path)
+    except Exception:
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
+
+    return {
+        "output_tscn": str(out_path),
+        "sprite_frames_res": tres_uri,
+        "root_name": safe_root_name,
+        "root_type": safe_root_type,
+        "collider": collider,
+    }
+

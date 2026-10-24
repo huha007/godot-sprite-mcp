@@ -30,6 +30,7 @@ def inspect_spritesheet(
     image_path: str,
     alpha_threshold: int = 10,
     mode: str = "auto",
+    project_root: str | None = None,
 ) -> dict[str, Any]:
     """Inspect a PNG spritesheet and return frame rectangles.
 
@@ -38,8 +39,8 @@ def inspect_spritesheet(
     alpha strictly greater than ``alpha_threshold`` count as opaque.
 
     Args:
-        image_path: Absolute path to the source PNG (or a path relative to the
-            MCP server's current working directory).
+        image_path: Absolute path, relative path, or ``res://...`` URI to the
+            source PNG.
         alpha_threshold: Opaque-pixel cutoff in the inclusive range 0..255.
             Defaults to 10, so nearly transparent antialiasing is ignored.
         mode: Detection strategy:
@@ -47,6 +48,8 @@ def inspect_spritesheet(
             "islands" finds 8-connected opaque islands and their tight bounding
             boxes, and "auto" tries "grid" first and falls back to "islands"
             when cell sizes are not uniform.
+        project_root: Optional Godot project root directory used to resolve
+            ``res://`` URIs or relative paths.
 
     Returns:
         A JSON-compatible dictionary with ``image_width``, ``image_height``,
@@ -60,6 +63,7 @@ def inspect_spritesheet(
         image_path=image_path,
         alpha_threshold=alpha_threshold,
         mode=mode,
+        project_root=project_root,
     )
 
 
@@ -115,6 +119,7 @@ def extract_collision_polygon(
     region: dict | None = None,
     epsilon: float = 2.0,
     centered: bool = True,
+    project_root: str | None = None,
 ) -> dict[str, Any]:
     """Extract a simplified outer collision polygon from opaque pixels.
 
@@ -127,7 +132,7 @@ def extract_collision_polygon(
     with at most 24 vertices, suitable for a CollisionPolygon2D.
 
     Args:
-        image_path: Absolute path to a source PNG.
+        image_path: Absolute path, relative path, or ``res://`` URI to a PNG.
         region: Optional sub-region ``{"x": int, "y": int, "w": int, "h": int}``
             in image pixels. When omitted, the whole image is used. Returned
             coordinates are relative to this region's top-left corner.
@@ -140,6 +145,8 @@ def extract_collision_polygon(
             centre. For a region of size ``w x h`` the conversion is
             ``x - w / 2`` and ``y - h / 2``. Set to false to keep pixel-space
             coordinates with a top-left origin.
+        project_root: Optional Godot project root directory for resolving
+            ``res://`` URIs.
 
     Returns:
         A dictionary with ``points`` (list of [x, y]), ``vertex_count``,
@@ -153,6 +160,7 @@ def extract_collision_polygon(
         region=region,
         epsilon=epsilon,
         centered=centered,
+        project_root=project_root,
     )
 
 
@@ -163,6 +171,7 @@ def build_body_collider(
     shape: str = "rectangle",
     alpha_threshold: int = 10,
     thickness_ratio: float = 0.30,
+    project_root: str | None = None,
 ) -> dict[str, Any]:
     """Build a stable single-shape body collider for a moving character.
 
@@ -173,7 +182,7 @@ def build_body_collider(
     extract_collision_polygon tool remains available for static objects.
 
     Args:
-        image_path: Absolute path to the spritesheet image.
+        image_path: Path or ``res://`` URI to the spritesheet image.
         frames: Every frame region of the selected animation, for example
             ``[{"x": 0, "y": 264, "w": 66, "h": 66}, ...]``. All frames must
             have the same width and height.
@@ -184,6 +193,8 @@ def build_body_collider(
         thickness_ratio: A column must have at least this fraction of the
             character height to count as core body. Defaults to 0.30, which
             filters thin weapons and arms.
+        project_root: Optional Godot project root directory for resolving
+            ``res://`` URIs.
 
     Returns:
         A JSON-compatible dictionary containing height/top/bottom, filtered
@@ -195,6 +206,55 @@ def build_body_collider(
     return core.build_body_collider(
         image_path=image_path,
         frames=frames,
+        shape=shape,
+        alpha_threshold=alpha_threshold,
+        thickness_ratio=thickness_ratio,
+        project_root=project_root,
+    )
+
+
+@mcp.tool()
+def build_character_scene(
+    project_root: str,
+    image_path: str,
+    sprite_frames_tres: str,
+    output_tscn: str,
+    collider_frames: list[dict],
+    root_name: str = "Character",
+    root_type: str = "CharacterBody2D",
+    default_animation: str = "idle",
+    shape: str = "rectangle",
+    alpha_threshold: int = 10,
+    thickness_ratio: float = 0.30,
+) -> dict[str, Any]:
+    """Write a complete Godot 4 .tscn character scene with AnimatedSprite2D and feet-aligned body collider.
+
+    Args:
+        project_root: Path to the Godot project directory containing ``project.godot``.
+        image_path: Path or ``res://`` URI to the spritesheet PNG.
+        sprite_frames_tres: Path or ``res://`` URI to the generated SpriteFrames ``.tres`` resource.
+        output_tscn: Destination ``.tscn`` file path or ``res://`` URI.
+        collider_frames: Frame regions (typically the idle animation row) used to compute the body collider.
+        root_name: Root node name in the scene (default: ``"Character"``).
+        root_type: Root node Godot class (default: ``"CharacterBody2D"``).
+        default_animation: Default animation name for the AnimatedSprite2D (default: ``"idle"``).
+        shape: ``"rectangle"`` (default) or ``"capsule"``.
+        alpha_threshold: Opaque alpha cutoff 0..255 (default: 10).
+        thickness_ratio: Minimum vertical column thickness ratio (default: 0.30).
+
+    Returns:
+        Metadata including the written ``output_tscn`` path, ``sprite_frames_res`` URI, and ``collider`` details.
+    """
+
+    return core.build_character_scene(
+        project_root=project_root,
+        image_path=image_path,
+        sprite_frames_tres=sprite_frames_tres,
+        output_tscn=output_tscn,
+        collider_frames=collider_frames,
+        root_name=root_name,
+        root_type=root_type,
+        default_animation=default_animation,
         shape=shape,
         alpha_threshold=alpha_threshold,
         thickness_ratio=thickness_ratio,
